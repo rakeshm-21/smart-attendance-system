@@ -6,4 +6,3 @@ qrcode[pil]
 pandas
 openpyxl
 gunicorn
-cmake
