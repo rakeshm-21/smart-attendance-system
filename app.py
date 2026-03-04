@@ -29,7 +29,7 @@ def get_db_connection():
         port=int(os.environ.get("MYSQLPORT", 3306))
     )
 
-@app.route("/register", methods=["GET","POST"])
+@app.route("/register", methods=["GET", "POST"])
 def register():
 
     db = get_db_connection()
@@ -40,14 +40,13 @@ def register():
         roll = request.form["roll"]
 
         cursor.execute(
-    "INSERT INTO students (name, roll_no) VALUES (%s,%s)",
-    (name, roll)
-)
+            "INSERT INTO students (name, roll_no) VALUES (%s,%s)",
+            (name, roll)
+        )
 
         db.commit()
 
     return render_template("register.html")
-
 
 # =====================================================
 # AUTO RECONNECT DATABASE
