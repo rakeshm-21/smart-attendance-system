@@ -1,0 +1,5 @@
+static/qr/
+static/faces/
+__pycache__/
+.vscode/
+attendance_report.xlsx
