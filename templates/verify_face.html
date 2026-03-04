@@ -1,50 +1,140 @@
-<video id="video" autoplay></video>
-<button onclick="capture()">Verify Face</button>
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Face Verification</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+<style>
+
+body{
+font-family:Poppins;
+text-align:center;
+}
+
+video{
+border:4px solid #4CAF50;
+border-radius:10px;
+}
+
+button{
+margin-top:20px;
+padding:10px 20px;
+background:#4CAF50;
+color:white;
+border:none;
+border-radius:6px;
+font-size:16px;
+cursor:pointer;
+}
+
+button:hover{
+background:#2e7d32;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="navbar">
+<h2>Smart Attendance System</h2>
+<a href="/logout" style="color:white;">Logout</a>
+</div>
+
+<h2>Face Verification</h2>
+
+<p>Look at the camera and verify your face</p>
+
+<video id="video" width="320" height="240" autoplay></video>
+
+<br><br>
+
+<button onclick="verify()">Verify Face</button>
 
 <script>
+
+let video = document.getElementById("video");
+
 navigator.mediaDevices.getUserMedia({video:true})
 .then(stream=>{
-video.srcObject=stream;
+video.srcObject = stream;
+})
+.catch(err=>{
+alert("Camera access failed");
+console.error(err);
 });
 
-function capture(){
 
-let canvas=document.createElement("canvas");
-canvas.width=320;
-canvas.height=240;
+function verify(){
 
-canvas.getContext('2d')
-.drawImage(video,0,0);
+let canvas = document.createElement("canvas");
 
-let image=canvas.toDataURL();
+canvas.width = video.videoWidth;
+canvas.height = video.videoHeight;
 
-navigator.geolocation.getCurrentPosition(pos=>{
+let context = canvas.getContext("2d");
 
-fetch("/verify_face",{
+context.drawImage(video,0,0,canvas.width,canvas.height);
+
+let image = canvas.toDataURL("image/jpeg");
+
+fetch("/face_verify_api",{
 method:"POST",
-headers:{'Content-Type':'application/json'},
-body:JSON.stringify({image:image})
-})
-.then(r=>r.json())
-.then(face=>{
-
-if(face.status=="matched"){
-
-fetch("/mark_attendance",{
-method:"POST",
-headers:{'Content-Type':'application/json'},
+headers:{
+"Content-Type":"application/json"
+},
 body:JSON.stringify({
-lat:pos.coords.latitude,
-lon:pos.coords.longitude
+image:image
 })
-}).then(()=>location="/attendance_success");
+})
+.then(res=>res.json())
+.then(data=>{
+
+if(data.status==="success"){
+
+alert("Attendance marked for " + data.student);
+
+window.location="/scan_qr";
 
 }
+
+else if(data.status==="already_marked"){
+
+alert("Attendance already marked");
+
+}
+
+else if(data.status==="face_failed"){
+
+alert("Face verification failed");
+
+}
+
+else if(data.status==="no_face"){
+
+alert("No face detected");
+
+}
+
 else{
-location="/attendance_failed";
+
+alert("Verification error");
+
 }
 
+})
+.catch(err=>{
+console.error(err);
+alert("Server error");
 });
-});
+
 }
+
 </script>
+
+</body>
+</html>

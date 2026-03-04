@@ -1,108 +1,178 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <title>Faculty Dashboard</title>
 
-<style>
-body{
-    font-family:Arial;
-    background:#e9edf5;
-    text-align:center;
-}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
-.card{
-    background:white;
-    width:420px;
-    margin:auto;
-    padding:30px;
-    border-radius:10px;
-    box-shadow:0 0 10px gray;
-}
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;600&display=swap" rel="stylesheet">
 
-img{
-    width:220px;
-    margin-top:15px;
-}
-</style>
+<!-- ICONS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
 </head>
 
 <body>
 
-<h1>Faculty Attendance Dashboard</h1>
+<!-- NAVBAR -->
+<div class="navbar">
+<h2>Smart Attendance</h2>
+<a href="/logout">Logout</a>
+</div>
 
-<div class="card">
 
-<h3>Live Attendance Session</h3>
+<!-- SIDEBAR -->
+<div class="sidebar">
 
-<img id="qrImage" src="" />
+<a href="/faculty_dashboard">
+<i class="fa-solid fa-chart-line"></i> Dashboard
+</a>
 
-<h2 id="timer" style="color:red">
-QR Expires In : 120 sec
-</h2>
+<a href="#" onclick="generateQR()">
+<i class="fa-solid fa-qrcode"></i> Generate QR
+</a>
 
-<h3>
-Students Present :
-<span id="count" style="color:green">0</span>
-</h3>
-
-<br>
-
-<a href="/logout">
-<button style="background:red;color:white;padding:10px 20px">
-Logout
-</button>
+<a href="#attendance">
+<i class="fa-solid fa-users"></i> Live Attendance
 </a>
 
 </div>
 
+
+<!-- MAIN CONTENT -->
+<div class="main">
+
+<h2>Faculty Dashboard</h2>
+
+
+<!-- DASHBOARD CARDS -->
+<div class="cards">
+
+<div class="card">
+<i class="fa-solid fa-user-check card-icon"></i>
+<h3 id="count">0</h3>
+<p>Today's Attendance</p>
+</div>
+
+<div class="card">
+<i class="fa-solid fa-qrcode card-icon"></i>
+<h3>QR</h3>
+<p>Generate Attendance QR</p>
+</div>
+
+</div>
+
+
+<!-- GENERATE QR -->
+<button onclick="generateQR()" class="btn">
+<i class="fa-solid fa-qrcode"></i> Generate QR
+</button>
+
+<br><br>
+
+<img id="qrImage" width="220">
+
+<p id="timer"></p>
+
+
+<h3 id="attendance">Live Attendance</h3>
+
+<table>
+
+<thead>
+<tr>
+<th>Name</th>
+<th>Roll</th>
+<th>Time</th>
+</tr>
+</thead>
+
+<tbody id="attendanceTable">
+</tbody>
+
+</table>
+
+</div>
+
+
 <script>
 
-let timeLeft = 0;
+let countdown;
 
-/* ================= GENERATE QR ================= */
+
+// Generate QR
 function generateQR(){
 
 fetch("/generate_qr")
+
 .then(res=>res.json())
+
 .then(data=>{
 
-document.getElementById("qrImage").src = data.qr;
+document.getElementById("qrImage").src=data.qr
 
-timeLeft = data.expires;
+let time=data.expires
 
-});
+clearInterval(countdown)
+
+countdown=setInterval(()=>{
+
+time--
+
+document.getElementById("timer").innerText="QR expires in "+time+" seconds"
+
+if(time<=0){
+
+clearInterval(countdown)
+
+document.getElementById("timer").innerText="QR Expired"
+
 }
 
-/* ================= TIMER ================= */
-setInterval(()=>{
+},1000)
 
-if(timeLeft>0){
-timeLeft--;
-document.getElementById("timer")
-.innerText="QR Expires In : "+timeLeft+" sec";
-}
-else{
-generateQR();   // AUTO NEW QR
+})
+
 }
 
-},1000);
 
+// Load Attendance
+function loadAttendance(){
 
-/* ================= LIVE COUNT ================= */
-setInterval(()=>{
+fetch("/live_attendance")
 
-fetch("/live_count")
 .then(res=>res.json())
+
 .then(data=>{
-document.getElementById("count").innerText=data.count;
-});
 
-},3000);
+let table=""
+
+data.forEach(student=>{
+
+table+=`
+<tr>
+<td>${student.name}</td>
+<td>${student.roll}</td>
+<td>${student.time}</td>
+</tr>
+`
+
+})
+
+document.getElementById("attendanceTable").innerHTML=table
+
+document.getElementById("count").innerText=data.length
+
+})
+
+}
 
 
-/* FIRST LOAD */
-generateQR();
+// Refresh attendance every 3 seconds
+setInterval(loadAttendance,3000)
+
+loadAttendance()
 
 </script>
 

@@ -1,92 +1,143 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <title>Select Role</title>
 
-<title>Select Role</title>
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;600&display=swap" rel="stylesheet">
 
-<style>
+    <!-- External CSS (Flask static folder) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
-body{
-font-family:Arial;
-background:#e9eef6;
-display:flex;
-justify-content:center;
-align-items:center;
-height:100vh;
-}
+    <style>
+        body{
+            font-family:'Poppins', Arial, sans-serif;
+            background:#e9eef6;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            height:100vh;
+            margin:0;
+        }
 
-.container{
-text-align:center;
-}
+        /* Navbar (NEW - Fixed) */
+        .navbar{
+            width:100%;
+            background:#2c3e50;
+            color:white;
+            padding:15px 30px;
+            position:absolute;
+            top:0;
+            left:0;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            box-sizing:border-box;
+        }
 
-.cards{
-display:flex;
-gap:40px;
-margin-top:40px;
-}
+        .navbar h2{
+            margin:0;
+        }
 
-.card{
-background:white;
-padding:40px;
-width:280px;
-border-radius:15px;
-box-shadow:0px 5px 20px rgba(0,0,0,0.1);
-cursor:pointer;
-transition:0.3s;
-}
+        .navbar a{
+            color:white;
+            text-decoration:none;
+            font-weight:500;
+        }
 
-.card:hover{
-transform:scale(1.05);
-}
+        .container{
+            text-align:center;
+            margin-top:60px;
+        }
 
-.icon{
-font-size:60px;
-margin-bottom:15px;
-}
+        .container h1{
+            margin-bottom:10px;
+        }
 
-</style>
+        .container p{
+            color:#555;
+        }
 
+        /* Cards Layout */
+        .cards{
+            display:flex;
+            gap:40px;
+            margin-top:40px;
+            justify-content:center;
+            flex-wrap:wrap;
+        }
+
+        /* Updated Card Design (Improved) */
+        .card{
+            background:white;
+            padding:40px;
+            width:280px;
+            border-radius:15px;
+            box-shadow:0px 10px 25px rgba(0,0,0,0.1);
+            cursor:pointer;
+            transition:0.3s;
+            text-align:center;
+        }
+
+        /* Better Hover Effect */
+        .card:hover{
+            transform:scale(1.08);
+            box-shadow:0px 15px 30px rgba(0,0,0,0.15);
+        }
+
+        .icon{
+            font-size:60px;
+            margin-bottom:15px;
+        }
+
+        h2{
+            margin:10px 0;
+        }
+
+        p{
+            font-size:14px;
+        }
+    </style>
 </head>
 
 <body>
 
-<div class="container">
+    <!-- Navbar -->
+    <div class="navbar">
+        <h2>Smart Attendance System</h2>
+        <a href="/logout">Logout</a>
+    </div>
 
-<h1>Select Your Role</h1>
-<p>Choose how you want to access the attendance system</p>
+    <!-- Main Container -->
+    <div class="container">
+        <h1>Select Your Role</h1>
+        <p>Choose how you want to access the attendance system</p>
 
-<div class="cards">
+        <div class="cards">
 
-<div class="card"
-onclick="location.href='/student_login'">
+            <!-- Student Card -->
+            <div class="card" onclick="location.href='/student_login'">
+                <div class="icon">🎓</div>
+                <h2>Student</h2>
+                <p>Mark attendance using QR & Face</p>
+            </div>
 
-<div class="icon">🎓</div>
-<h2>Student</h2>
-<p>Mark attendance using QR & Face</p>
+            <!-- Faculty Card -->
+            <div class="card" onclick="location.href='/faculty_login'">
+                <div class="icon">👨‍🏫</div>
+                <h2>Faculty</h2>
+                <p>Generate QR & Manage Attendance</p>
+            </div>
 
-</div>
+            <!-- Admin Card -->
+            <div class="card" onclick="location.href='/admin_login'">
+                <div class="icon">⚙️</div>
+                <h2>Admin</h2>
+                <p>System Monitoring Panel</p>
+            </div>
 
-<div class="card"
-onclick="location.href='/faculty_login'">
-
-<div class="icon">👨‍🏫</div>
-<h2>Faculty</h2>
-<p>Generate QR & Manage Attendance</p>
-
-</div>
-
-<div class="card"
-onclick="location.href='/admin_login'">
-
-<div class="icon">⚙️</div>
-<h2>Admin</h2>
-<p>System Monitoring Panel</p>
-
-</div>
-
-</div>
-
-</div>
+        </div>
+    </div>
 
 </body>
 </html>

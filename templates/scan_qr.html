@@ -1,50 +1,200 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <title>Scan QR</title>
 
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
 <script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+
+body{
+font-family:Poppins;
+background:#f5f7fb;
+margin:0;
+}
+
+/* SCANNER CARD */
+
+.scanner-box{
+width:360px;
+margin:100px auto;
+background:white;
+padding:30px;
+border-radius:10px;
+box-shadow:0 5px 15px rgba(0,0,0,0.1);
+text-align:center;
+}
+
+#reader{
+margin:auto;
+width:300px;
+}
+
+.status{
+margin-top:15px;
+font-size:14px;
+color:#555;
+}
+
+</style>
 
 </head>
 
 <body>
 
-<h2>Scan QR</h2>
+<div class="navbar">
+<h2>Smart Attendance System</h2>
+<a href="/logout" style="color:white;">Logout</a>
+</div>
 
-<div id="reader" style="width:300px"></div>
+
+<div class="scanner-box">
+
+<h2>Scan Attendance QR</h2>
+
+<div id="reader"></div>
+
+<div class="status">
+Scan the QR shown on Faculty screen
+</div>
+
+</div>
+
 
 <script>
 
-function onScanSuccess(decodedText) {
+function onScanSuccess(decodedText){
 
-    fetch("/verify_qr",{
-        method:"POST",
-        headers:{
-            "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-            token:decodedText
-        })
-    })
-    .then(res=>res.json())
-    .then(data=>{
+console.log("QR Content:",decodedText)
 
-        if(data.status=="valid"){
-            window.location="/verify_face";
-        }
-        else{
-            alert("Invalid or Expired QR");
-        }
+let token = decodedText
 
-    });
+// Extract token if QR contains URL
+if(decodedText.includes("=")){
+token = decodedText.split("=")[1]
 }
 
-let scanner = new Html5QrcodeScanner(
-    "reader",
-    { fps:10, qrbox:250 }
-);
+console.log("Extracted Token:",token)
 
-scanner.render(onScanSuccess);
+
+// GPS Verification
+if(navigator.geolocation){
+
+navigator.geolocation.getCurrentPosition(
+
+function(position){
+
+let lat = position.coords.latitude
+let lon = position.coords.longitude
+
+console.log("Latitude:",lat)
+console.log("Longitude:",lon)
+
+
+fetch("/verify_qr",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+token:token,
+latitude:lat,
+longitude:lon
+})
+})
+
+.then(res=>res.json())
+
+.then(data=>{
+
+console.log("Server response:",data)
+
+if(data.status==="valid"){
+
+alert("QR Verified. Starting Face Verification...")
+
+window.location="/verify_face"
+
+}
+
+else if(data.status==="location_failed"){
+
+alert("You are not inside the classroom or campus area")
+
+}
+
+else if(data.status==="expired"){
+
+alert("QR Code Expired. Ask faculty to generate a new QR.")
+
+}
+
+else if(data.status==="invalid"){
+
+alert("Invalid QR Code")
+
+}
+
+else if(data.status==="login_required"){
+
+alert("Please login first")
+
+window.location="/student_login"
+
+}
+
+else{
+
+alert("Unable to verify QR")
+
+}
+
+})
+
+.catch(err=>{
+
+console.error(err)
+
+alert("Server error verifying QR")
+
+})
+
+},
+
+function(error){
+
+alert("Location permission required for attendance")
+
+}
+
+)
+
+}
+
+else{
+
+alert("Geolocation not supported by this device")
+
+}
+
+}
+
+
+
+let scanner = new Html5QrcodeScanner(
+"reader",
+{
+fps:10,
+qrbox:250
+}
+)
+
+scanner.render(onScanSuccess)
 
 </script>
 

@@ -1,8 +1,8 @@
 Flask
 mysql-connector-python
-gunicorn
-qrcode
-opencv-python-headless
-numpy
+opencv-python
 face-recognition
-Pillow
+numpy
+qrcode
+pandas
+openpyxl

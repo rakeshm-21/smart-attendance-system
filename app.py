@@ -1,18 +1,24 @@
-from flask import Flask, render_template, request, redirect, session, jsonify, url_for
-from face_verify import register_face, verify_face
+from flask import Flask, render_template, request, redirect, session, jsonify, url_for, send_file
 import mysql.connector
 import hashlib
 import uuid
 import datetime
 import qrcode
 import os
+import base64
+import numpy as np
+import face_recognition
+import cv2
+import pandas as pd
 
 app = Flask(__name__)
 app.secret_key = "smart_attendance_secret"
 
+
 # =====================================================
 # DATABASE CONNECTION
 # =====================================================
+
 db = mysql.connector.connect(
     host="localhost",
     user="root",
@@ -22,16 +28,36 @@ db = mysql.connector.connect(
 
 cursor = db.cursor(buffered=True)
 
+
+# =====================================================
+# AUTO RECONNECT DATABASE
+# =====================================================
+
+def reconnect_db():
+    global db, cursor
+
+    if not db.is_connected():
+        db = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="Rakesh",
+            database="attendance_system"
+        )
+        cursor = db.cursor(buffered=True)
+
+
 # =====================================================
 # PASSWORD HASH
 # =====================================================
+
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 
 # =====================================================
-# HOME ROLE PAGE
+# HOME
 # =====================================================
+
 @app.route("/")
 def home():
     return render_template("role_select.html")
@@ -46,6 +72,8 @@ def student_login():
 
     if request.method == "POST":
 
+        reconnect_db()
+
         email = request.form.get("email")
         password = hash_password(request.form.get("password"))
 
@@ -59,21 +87,24 @@ def student_login():
         if user:
             session["student_id"] = user[0]
             session["student_name"] = user[1]
+
             return redirect(url_for("scan_qr"))
 
-        return render_template("login.html",
-                               error="Invalid Login")
+        return render_template("login.html",error="Invalid Login")
 
     return render_template("login.html")
 
 
 # =====================================================
-# STUDENT REGISTER + FACE CAPTURE
+# STUDENT REGISTER
 # =====================================================
+
 @app.route("/register", methods=["GET","POST"])
 def register():
 
     if request.method == "POST":
+
+        reconnect_db()
 
         cursor.execute("""
         INSERT INTO students(name,roll_number,email,password)
@@ -89,19 +120,78 @@ def register():
 
         student_id = cursor.lastrowid
 
-        # FACE REGISTER
-        register_face(student_id)
+        session["student_id"] = student_id
 
-        return redirect(url_for("student_login"))
+        return redirect("/register_face")
 
     return render_template("register.html")
 
+
+# =====================================================
+# FACE REGISTRATION PAGE
+# =====================================================
+
+@app.route("/register_face")
+def register_face():
+
+    if "student_id" not in session:
+        return redirect("/student_login")
+
+    return render_template("register_face.html")
+
+
+# =====================================================
+# SAVE FACE IMAGE
+# =====================================================
+
+@app.route("/save_face",methods=["POST"])
+def save_face():
+
+    if "student_id" not in session:
+        return jsonify({"status":"login_required"})
+
+    reconnect_db()
+
+    student_id=session["student_id"]
+
+    cursor.execute(
+        "SELECT roll_number FROM students WHERE id=%s",
+        (student_id,)
+    )
+
+    roll = cursor.fetchone()[0]
+
+    data=request.get_json()
+
+    image_data=data["image"].split(",")[1]
+
+    image_bytes=base64.b64decode(image_data)
+
+    folder="static/faces"
+
+    os.makedirs(folder,exist_ok=True)
+
+    existing=[f for f in os.listdir(folder) if f.startswith(roll)]
+
+    count=len(existing)+1
+
+    path=f"{folder}/{roll}_{count}.jpg"
+
+    with open(path,"wb") as f:
+        f.write(image_bytes)
+
+    return jsonify({"status":"saved"})
+
+
+# =====================================================
+# QR SCAN PAGE
+# =====================================================
 
 @app.route("/scan_qr")
 def scan_qr():
 
     if "student_id" not in session:
-        return redirect(url_for("student_login"))
+        return redirect("/student_login")
 
     return render_template("scan_qr.html")
 
@@ -115,6 +205,8 @@ def faculty_register():
 
     if request.method=="POST":
 
+        reconnect_db()
+
         cursor.execute("""
         INSERT INTO faculty(name,email,password)
         VALUES(%s,%s,%s)
@@ -125,7 +217,8 @@ def faculty_register():
         ))
 
         db.commit()
-        return redirect(url_for("faculty_login"))
+
+        return redirect("/faculty_login")
 
     return render_template("faculty_register.html")
 
@@ -134,6 +227,8 @@ def faculty_register():
 def faculty_login():
 
     if request.method=="POST":
+
+        reconnect_db()
 
         cursor.execute("""
         SELECT id FROM faculty
@@ -146,13 +241,13 @@ def faculty_login():
         fac=cursor.fetchone()
 
         if fac:
-            session["faculty_id"]=fac[0]
-            return redirect(url_for("faculty_dashboard"))
 
-        return render_template(
-            "faculty_login.html",
-            error="Invalid Login"
-        )
+            session["faculty_id"]=fac[0]
+
+            return redirect("/faculty_dashboard")
+
+        return render_template("faculty_login.html",
+                               error="Invalid Login")
 
     return render_template("faculty_login.html")
 
@@ -161,22 +256,30 @@ def faculty_login():
 def faculty_dashboard():
 
     if "faculty_id" not in session:
-        return redirect(url_for("faculty_login"))
+        return redirect("/faculty_login")
 
     return render_template("faculty_dashboard.html")
 
 
 # =====================================================
-# QR GENERATION (AUTO EXPIRE)
+# QR GENERATION
 # =====================================================
+
 @app.route("/generate_qr")
 def generate_qr():
 
     if "faculty_id" not in session:
-        return redirect(url_for("faculty_login"))
+        return redirect("/faculty_login")
+
+    reconnect_db()
+
+    cursor.execute("DELETE FROM sessions WHERE expiry_time < NOW()")
+
+    db.commit()
 
     token=str(uuid.uuid4())
-    expiry=datetime.datetime.now()+datetime.timedelta(minutes=2)
+
+    expiry=datetime.datetime.now()+datetime.timedelta(minutes=10)
 
     cursor.execute("""
     INSERT INTO sessions(qr_token,expiry_time)
@@ -188,42 +291,42 @@ def generate_qr():
     os.makedirs("static/qr",exist_ok=True)
 
     img=qrcode.make(token)
+
     path=f"static/qr/{token}.png"
+
     img.save(path)
 
     return jsonify({
         "qr":"/"+path,
-        "expires":120
+        "expires":600
     })
 
 
 # =====================================================
-# LIVE ATTENDANCE COUNT
+# QR + GPS VERIFICATION
 # =====================================================
-@app.route("/live_count")
-def live_count():
 
-    cursor.execute("""
-    SELECT COUNT(DISTINCT student_id)
-    FROM attendance
-    WHERE date=CURDATE()
-    """)
-
-    count=cursor.fetchone()[0]
-
-    return jsonify({"count":count})
-
-
-# =====================================================
-# VERIFY QR + FACE + ATTENDANCE
-# =====================================================
 @app.route("/verify_qr",methods=["POST"])
 def verify_qr():
 
     if "student_id" not in session:
         return jsonify({"status":"login_required"})
 
-    token=request.json.get("token")
+    reconnect_db()
+
+    data=request.get_json()
+
+    token=data.get("token")
+    lat=data.get("latitude")
+    lon=data.get("longitude")
+
+    college_lat = 17.489651
+    college_lon = 78.316076
+
+    distance=((lat-college_lat)**2+(lon-college_lon)**2)**0.5
+
+    if distance > 0.002:
+        return jsonify({"status":"location_failed"})
 
     cursor.execute(
         "SELECT expiry_time FROM sessions WHERE qr_token=%s",
@@ -238,41 +341,169 @@ def verify_qr():
     if datetime.datetime.now()>data[0]:
         return jsonify({"status":"expired"})
 
+    return jsonify({"status":"valid"})
+
+
+# =====================================================
+# FACE VERIFY PAGE
+# =====================================================
+
+@app.route("/verify_face")
+def verify_face():
+
+    if "student_id" not in session:
+        return redirect("/student_login")
+
+    return render_template("verify_face.html")
+
+
+# =====================================================
+# FACE VERIFY API
+# =====================================================
+
+@app.route("/face_verify_api",methods=["POST"])
+def face_verify_api():
+
+    if "student_id" not in session:
+        return jsonify({"status":"login_required"})
+
+    reconnect_db()
+
     student_id=session["student_id"]
 
-    verified_name=verify_face(student_id)
+    cursor.execute(
+        "SELECT roll_number FROM students WHERE id=%s",
+        (student_id,)
+    )
 
-    if not verified_name:
-        return jsonify({"status":"face_failed"})
+    roll = cursor.fetchone()[0]
+
+    data=request.get_json()
+
+    image_data=data["image"].split(",")[1]
+
+    image_bytes=base64.b64decode(image_data)
+
+    np_arr=np.frombuffer(image_bytes,np.uint8)
+
+    frame=cv2.imdecode(np_arr,cv2.IMREAD_COLOR)
+
+    folder="static/faces"
+
+    known_encodings=[]
+
+    for file in os.listdir(folder):
+
+        if file.startswith(roll):
+
+            img_path=os.path.join(folder,file)
+
+            image=face_recognition.load_image_file(img_path)
+
+            enc=face_recognition.face_encodings(image)
+
+            if len(enc)>0:
+                known_encodings.append(enc[0])
+
+    face_locations=face_recognition.face_locations(frame)
+
+    encodings=face_recognition.face_encodings(frame,face_locations)
+
+    if len(encodings)==0:
+        return jsonify({"status":"no_face"})
+
+    distances=face_recognition.face_distance(
+        known_encodings,encodings[0]
+    )
+
+    best_match=min(distances)
+
+    if best_match < 0.55:
+
+        cursor.execute("""
+        SELECT * FROM attendance
+        WHERE student_id=%s AND date=CURDATE()
+        """,(student_id,))
+
+        if cursor.fetchone():
+            return jsonify({"status":"already_marked"})
+
+        cursor.execute("""
+        INSERT INTO attendance(student_id,date,time)
+        VALUES(%s,CURDATE(),CURTIME())
+        """,(student_id,))
+
+        db.commit()
+
+        return jsonify({
+            "status":"success",
+            "student":session["student_name"]
+        })
+
+    return jsonify({"status":"face_failed"})
+
+
+# =====================================================
+# LIVE ATTENDANCE COUNT
+# =====================================================
+
+@app.route("/live_count")
+def live_count():
+
+    reconnect_db()
 
     cursor.execute("""
-    SELECT * FROM attendance
-    WHERE student_id=%s AND date=CURDATE()
-    """,(student_id,))
+    SELECT COUNT(DISTINCT student_id)
+    FROM attendance
+    WHERE date=CURDATE()
+    """)
 
-    if cursor.fetchone():
-        return jsonify({"status":"already_marked"})
+    count=cursor.fetchone()[0]
+
+    return jsonify({"count":count})
+
+
+# =====================================================
+# LIVE ATTENDANCE LIST
+# =====================================================
+
+@app.route("/live_attendance")
+def live_attendance():
+
+    reconnect_db()
 
     cursor.execute("""
-    INSERT INTO attendance(student_id,date,time)
-    VALUES(%s,CURDATE(),CURTIME())
-    """,(student_id,))
+    SELECT s.name, s.roll_number, a.time
+    FROM attendance a
+    JOIN students s ON a.student_id=s.id
+    WHERE a.date=CURDATE()
+    ORDER BY a.time DESC
+    """)
 
-    db.commit()
+    rows=cursor.fetchall()
 
-    return jsonify({
-        "status":"success",
-        "student":verified_name
-    })
+    students=[]
+
+    for row in rows:
+        students.append({
+            "name":row[0],
+            "roll":row[1],
+            "time":str(row[2])
+        })
+
+    return jsonify(students)
 
 
 # =====================================================
 # ================= ADMIN =================
 # =====================================================
+
 @app.route("/admin_register",methods=["GET","POST"])
 def admin_register():
 
     if request.method=="POST":
+
+        reconnect_db()
 
         cursor.execute("""
         INSERT INTO admin(username,password)
@@ -283,7 +514,8 @@ def admin_register():
         ))
 
         db.commit()
-        return redirect(url_for("admin_login"))
+
+        return redirect("/admin_login")
 
     return render_template("admin_register.html")
 
@@ -292,6 +524,8 @@ def admin_register():
 def admin_login():
 
     if request.method=="POST":
+
+        reconnect_db()
 
         cursor.execute("""
         SELECT id FROM admin
@@ -304,13 +538,13 @@ def admin_login():
         admin=cursor.fetchone()
 
         if admin:
-            session["admin"]=admin[0]
-            return redirect(url_for("admin_dashboard"))
 
-        return render_template(
-            "admin_login.html",
-            error="Invalid Login"
-        )
+            session["admin"]=admin[0]
+
+            return redirect("/admin_dashboard")
+
+        return render_template("admin_login.html",
+                               error="Invalid Login")
 
     return render_template("admin_login.html")
 
@@ -319,7 +553,9 @@ def admin_login():
 def admin_dashboard():
 
     if "admin" not in session:
-        return redirect(url_for("admin_login"))
+        return redirect("/admin_login")
+
+    reconnect_db()
 
     cursor.execute("SELECT COUNT(*) FROM students")
     students=cursor.fetchone()[0]
@@ -339,14 +575,123 @@ def admin_dashboard():
 
 
 # =====================================================
+# ADMIN ANALYTICS API
+# =====================================================
+
+@app.route("/attendance_stats")
+def attendance_stats():
+
+    reconnect_db()
+
+    cursor.execute("""
+    SELECT date, COUNT(*)
+    FROM attendance
+    GROUP BY date
+    ORDER BY date DESC
+    LIMIT 7
+    """)
+
+    rows=cursor.fetchall()
+
+    days=[]
+    counts=[]
+
+    for r in rows:
+        days.append(str(r[0]))
+        counts.append(r[1])
+
+    days.reverse()
+    counts.reverse()
+
+    return jsonify({
+        "days":days,
+        "counts":counts
+    })
+
+
+# =====================================================
+# GET ALL STUDENTS (ADMIN)
+# =====================================================
+
+@app.route("/get_students")
+def get_students():
+
+    reconnect_db()
+
+    cursor.execute("""
+    SELECT name, roll_number, email
+    FROM students
+    """)
+
+    rows=cursor.fetchall()
+
+    students=[]
+
+    for r in rows:
+        students.append({
+            "name":r[0],
+            "roll":r[1],
+            "email":r[2]
+        })
+
+    return jsonify(students)
+
+
+# =====================================================
+# EXPORT ATTENDANCE TO EXCEL
+# =====================================================
+
+@app.route("/export_attendance")
+def export_attendance():
+
+    if "admin" not in session:
+        return redirect("/admin_login")
+
+    reconnect_db()
+
+    cursor.execute("""
+    SELECT s.name, s.roll_number, a.date, a.time
+    FROM attendance a
+    JOIN students s ON a.student_id=s.id
+    ORDER BY a.date DESC
+    """)
+
+    rows=cursor.fetchall()
+
+    data=[]
+
+    for r in rows:
+        data.append({
+            "Name":r[0],
+            "Roll Number":r[1],
+            "Date":str(r[2]),
+            "Time":str(r[3])
+        })
+
+    df=pd.DataFrame(data)
+
+    file_path="attendance_report.xlsx"
+
+    df.to_excel(file_path,index=False)
+
+    return send_file(file_path,as_attachment=True)
+
+
+# =====================================================
 # LOGOUT
 # =====================================================
+
 @app.route("/logout")
 def logout():
+
     session.clear()
-    return redirect(url_for("home"))
+
+    return redirect("/")
 
 
 # =====================================================
+# RUN SERVER
+# =====================================================
+
 if __name__=="__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0",port=5000,debug=True)
