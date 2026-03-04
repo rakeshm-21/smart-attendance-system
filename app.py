@@ -16,16 +16,19 @@ app.secret_key = "smart_attendance_secret"
 
 
 # =====================================================
-# DATABASE CONNECTION
+# DATABASE CONNECTION (RAILWAY READY)
 # =====================================================
 
-db = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="Rakesh",
-    database="attendance_system"
-)
+def get_db_connection():
+    return mysql.connector.connect(
+        host=os.environ.get("MYSQLHOST"),
+        user=os.environ.get("MYSQLUSER"),
+        password=os.environ.get("MYSQLPASSWORD"),
+        database=os.environ.get("MYSQLDATABASE"),
+        port=int(os.environ.get("MYSQLPORT", 3306))
+    )
 
+db = get_db_connection()
 cursor = db.cursor(buffered=True)
 
 
@@ -35,14 +38,10 @@ cursor = db.cursor(buffered=True)
 
 def reconnect_db():
     global db, cursor
-
-    if not db.is_connected():
-        db = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="Rakesh",
-            database="attendance_system"
-        )
+    try:
+        db.ping(reconnect=True)
+    except:
+        db = get_db_connection()
         cursor = db.cursor(buffered=True)
 
 
@@ -690,8 +689,9 @@ def logout():
 
 
 # =====================================================
-# RUN SERVER
+# RUN SERVER (RENDER READY)
 # =====================================================
 
 if __name__=="__main__":
-    app.run(host="0.0.0.0",port=5000,debug=True)
+    port=int(os.environ.get("PORT",5000))
+    app.run(host="0.0.0.0",port=port,debug=True)

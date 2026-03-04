@@ -4,5 +4,6 @@ __pycache__/
 .vscode/
 attendance_report.xlsx
 shape_predictor_68_face_landmarks (1).dat
+shape_predictor_68_face_landmarks.dat
 *.pyc
 .env
