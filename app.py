@@ -28,6 +28,9 @@ def get_db_connection():
         database=os.environ.get("MYSQLDATABASE"),
         port=int(os.environ.get("MYSQLPORT", 3306))
     )
+# INITIAL DATABASE CONNECTION
+db = get_db_connection()
+cursor = db.cursor(buffered=True)
 
 # =====================================================
 # AUTO RECONNECT DATABASE
