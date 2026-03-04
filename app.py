@@ -166,7 +166,7 @@ def save_face():
 
     image_bytes=base64.b64decode(image_data)
 
-    folder="static/faces"
+    folder=os.path.join(app.root_path,"static","faces")
 
     os.makedirs(folder,exist_ok=True)
 
@@ -387,7 +387,7 @@ def face_verify_api():
 
     frame=cv2.imdecode(np_arr,cv2.IMREAD_COLOR)
 
-    folder="static/faces"
+    folder=os.path.join(app.root_path,"static","faces")
 
     known_encodings=[]
 
