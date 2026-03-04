@@ -40,9 +40,9 @@ def register():
         roll = request.form["roll"]
 
         cursor.execute(
-            "INSERT INTO students (name, roll) VALUES (%s,%s)",
-            (name, roll)
-        )
+    "INSERT INTO students (name, roll_no) VALUES (%s,%s)",
+    (name, roll)
+)
 
         db.commit()
 
