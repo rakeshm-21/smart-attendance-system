@@ -596,6 +596,29 @@ def admin_dashboard():
         faculty=faculty,
         attendance=attendance
     )
+@app.route("/face_dataset")
+def face_dataset():
+
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("SELECT name, roll FROM students")
+    students = cursor.fetchall()
+
+    faces = []
+
+    for s in students:
+
+        image_path = f"static/faces/{s['roll']}.jpg"
+
+        if os.path.exists(image_path):
+            faces.append({
+                "name": s["name"],
+                "roll": s["roll"],
+                "image": image_path
+            })
+
+    return render_template("face_dataset.html", faces=faces)
 
 
 # =====================================================
