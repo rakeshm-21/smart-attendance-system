@@ -602,19 +602,19 @@ def face_dataset():
     db = get_db_connection()
     cursor = db.cursor(dictionary=True)
 
-    cursor.execute("SELECT name, roll_no FROM students")
+    cursor.execute("SELECT name,roll_number FROM students")
     students = cursor.fetchall()
 
     faces = []
 
     for s in students:
 
-        image_path = f"static/faces/{s['roll_no']}.jpg"
+        image_path = f"static/faces/{s['roll_number']}.jpg"
 
         if os.path.exists(image_path):
             faces.append({
                 "name": s["name"],
-                "roll": s["roll_no"],
+                "roll": s["roll_number"],
                 "image": image_path
             })
 
