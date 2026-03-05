@@ -58,9 +58,12 @@ background:#2e7d32;
 <script>
 
 let video = document.getElementById("video");
+let stream = null;
 
+// START CAMERA
 navigator.mediaDevices.getUserMedia({video:true})
-.then(stream=>{
+.then(s=>{
+stream = s;
 video.srcObject = stream;
 })
 .catch(err=>{
@@ -69,6 +72,21 @@ console.error(err);
 });
 
 
+// FUNCTION TO STOP CAMERA
+function stopCamera(){
+
+if(stream){
+let tracks = stream.getTracks();
+
+tracks.forEach(track=>{
+track.stop();
+});
+}
+
+}
+
+
+// VERIFY FACE
 function verify(){
 
 let canvas = document.createElement("canvas");
@@ -94,31 +112,66 @@ image:image
 .then(res=>res.json())
 .then(data=>{
 
+// SUCCESS
 if(data.status==="success"){
 
 alert("Attendance marked for " + data.student);
 
-window.location="/scan_qr";
+// stop camera
+stopCamera();
+
+// redirect to home page
+window.location="/";
 
 }
 
+
+// ALREADY MARKED
 else if(data.status==="already_marked"){
 
 alert("Attendance already marked");
 
+// stop camera
+stopCamera();
+
+window.location="/";
+
 }
 
+
+// FACE FAILED
 else if(data.status==="face_failed"){
 
 alert("Face verification failed");
 
 }
 
+
+// NO FACE DETECTED
 else if(data.status==="no_face"){
 
 alert("No face detected");
 
 }
+
+
+// NO REGISTERED FACE
+else if(data.status==="no_registered_face"){
+
+alert("No registered face found");
+
+}
+
+
+// LOGIN REQUIRED
+else if(data.status==="login_required"){
+
+alert("Session expired. Please login again.");
+
+window.location="/student_login";
+
+}
+
 
 else{
 
