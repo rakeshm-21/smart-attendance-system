@@ -378,12 +378,12 @@ def verify_qr():
     lat=data.get("latitude")
     lon=data.get("longitude")
 
-    college_lat = 17.489651
-    college_lon = 78.316076
+    college_lat = 17.6039984
+    college_lon = 78.4842762
 
     distance=((lat-college_lat)**2+(lon-college_lon)**2)**0.5
 
-    if distance > 0.002:
+    if distance > 0.005:
         return jsonify({"status":"location_failed"})
 
     cursor.execute(
